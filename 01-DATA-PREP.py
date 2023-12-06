@@ -249,7 +249,7 @@ document_num_words from {catalog}.{schema}.movie_documents_silver limit 10000;''
 # COMMAND ----------
 
 #creating a subset of data for vector search delta sync
-df.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.movie_documents_for_sync")
+df.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.{sync_table_name}")
 
 # COMMAND ----------
 

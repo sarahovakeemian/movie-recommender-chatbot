@@ -89,7 +89,7 @@ endpoint_config = {
       "model_version": model_version,
       "workload_type": "CPU",
       "workload_size": "Medium", #maybe change to Medium
-      "scale_to_zero_enabled": True,
+      "scale_to_zero_enabled": False,
     }]
   }
 }
