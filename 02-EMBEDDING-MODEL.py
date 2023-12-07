@@ -1,9 +1,14 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC
-# MAGIC #EMBEDDING MODEL
+# MAGIC # 02 EMBEDDING MODEL
 # MAGIC
 # MAGIC The embedding model is what will be used to convert our plot summaries into vector embeddings. These vector embeddings will be loaded into a Vector Search Index and allow for fast "Similar Search". This is a very important part of the RAGs architechture. In this notebook we will be using the [e5-small-v2](https://huggingface.co/intfloat/e5-small-v2) open source embedding model from hugging face. 
+
+# COMMAND ----------
+
+# MAGIC %pip install --upgrade "mlflow-skinny[databricks]"
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -12,11 +17,8 @@ import pandas as pd
 import requests
 import time
 from sentence_transformers import SentenceTransformer
-
-# COMMAND ----------
-
-# MAGIC %pip install --upgrade "mlflow-skinny[databricks]"
-# MAGIC dbutils.library.restartPython()
+from mlflow.utils.databricks_utils import get_databricks_host_creds
+creds = get_databricks_host_creds()
 
 # COMMAND ----------
 
@@ -48,6 +50,11 @@ print(signature)
 
 # COMMAND ----------
 
+#start mlflow client
+mlflow_client = mlflow.MlflowClient()
+
+# COMMAND ----------
+
 #register model into UC
 model_info = mlflow.sentence_transformers.log_model(
   model,
@@ -57,8 +64,6 @@ model_info = mlflow.sentence_transformers.log_model(
   registered_model_name=registered_embedding_model_name)
 
 #write a model description
-mlflow_client = mlflow.MlflowClient()
-
 mlflow_client.update_registered_model(
   name=f"{registered_embedding_model_name}",
   description="https://huggingface.co/intfloat/e5-small-v2"
@@ -78,7 +83,7 @@ print(model_version)
 # COMMAND ----------
 
 #serve embedding model with model serving
-deploy_headers = {'Authorization': f'Bearer {db_token}', 'Content-Type': 'application/json'}
+deploy_headers = {'Authorization': f'Bearer {creds.token}', 'Content-Type': 'application/json'}
 deploy_url = f'{workspace_url}/api/2.0/serving-endpoints'
 endpoint_config = {
   "name": embedding_endpoint_name,
@@ -113,7 +118,7 @@ print(data_json)
 # COMMAND ----------
 
 #testing endpoint
-invoke_headers = {'Authorization': f'Bearer {db_token}', 'Content-Type': 'application/json'}
+invoke_headers = {'Authorization': f'Bearer {creds.token}', 'Content-Type': 'application/json'}
 invoke_url = f'{workspace_url}/serving-endpoints/{embedding_endpoint_name}/invocations'
 print(invoke_url)
 

@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md-sandbox
-# MAGIC ## Databricks Vector Search
+# MAGIC # 03 DATABRICKS VECTOR SEARCH
 # MAGIC In this notebook we will create a Vector Search Index on top of our Delta Lake table
 # MAGIC
 # MAGIC We now have our knowledge base ready, and saved as a Delta Lake table within Unity Catalog (including permission, lineage, audit logs and all UC features).

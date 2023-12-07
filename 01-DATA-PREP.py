@@ -1,7 +1,7 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC
-# MAGIC # DATA PREPARATION
+# MAGIC # 01 DATA PREPARATION
 # MAGIC
 # MAGIC In this notebook we will be preparing our data. 
 # MAGIC
