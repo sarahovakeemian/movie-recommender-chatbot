@@ -31,7 +31,7 @@ mlflow.set_registry_uri("databricks-uc")
 
 # COMMAND ----------
 
-#downloading the embedding model from hugging face
+# downloading the embedding model from Hugging Face
 source_model_name = 'intfloat/e5-small-v2'
 model = SentenceTransformer(source_model_name)
 
@@ -44,18 +44,18 @@ print(embeddings)
 
 # COMMAND ----------
 
-# Compute input/output schema.
+# Compute input/output schema
 signature = mlflow.models.signature.infer_signature(sentences, embeddings)
 print(signature)
 
 # COMMAND ----------
 
-#start mlflow client
+# start mlflow client
 mlflow_client = mlflow.MlflowClient()
 
 # COMMAND ----------
 
-#register model into UC
+# register model into UC
 model_info = mlflow.sentence_transformers.log_model(
   model,
   artifact_path="model",
@@ -63,7 +63,7 @@ model_info = mlflow.sentence_transformers.log_model(
   input_example=sentences,
   registered_model_name=registered_embedding_model_name)
 
-#write a model description
+# write a model description
 mlflow_client.update_registered_model(
   name=f"{registered_embedding_model_name}",
   description="https://huggingface.co/intfloat/e5-small-v2"
@@ -71,7 +71,7 @@ mlflow_client.update_registered_model(
 
 # COMMAND ----------
 
-#get latest version of model
+# get latest version of model
 def get_latest_model_version(mlflow_client, model_name):
   model_version_infos = mlflow_client.search_model_versions("name = '%s'" % model_name)
   return max([int(model_version_info.version) for model_version_info in model_version_infos])
@@ -82,7 +82,7 @@ print(model_version)
 
 # COMMAND ----------
 
-#serve embedding model with model serving
+# serve embedding model with model serving
 deploy_headers = {'Authorization': f'Bearer {creds.token}', 'Content-Type': 'application/json'}
 deploy_url = f'{workspace_url}/api/2.0/serving-endpoints'
 endpoint_config = {
@@ -92,8 +92,8 @@ endpoint_config = {
       "name": f'{embedding_model_name}',
       "model_name": registered_embedding_model_name,
       "model_version": model_version,
-      "workload_type": "CPU",
-      "workload_size": "Medium", #maybe change to Medium
+      "workload_type": "GPU_SMALL", # need faster serving for vector search
+      "workload_size": "Medium", # maybe change to Medium
       "scale_to_zero_enabled": False,
     }]
   }
@@ -108,8 +108,8 @@ print(deploy_response.json())
 
 # COMMAND ----------
 
-# Prepare data for query.
-#Query endpoint (once ready)
+# Prepare data for query
+# Query endpoint (once ready)
 sentences = ['Hello world', 'Good morning']
 ds_dict = {'dataframe_split': pd.DataFrame(pd.Series(sentences)).to_dict(orient='split')}
 data_json = json.dumps(ds_dict, allow_nan=True)
@@ -117,7 +117,7 @@ print(data_json)
 
 # COMMAND ----------
 
-#testing endpoint
+# testing endpoint
 invoke_headers = {'Authorization': f'Bearer {creds.token}', 'Content-Type': 'application/json'}
 invoke_url = f'{workspace_url}/serving-endpoints/{embedding_endpoint_name}/invocations'
 print(invoke_url)
