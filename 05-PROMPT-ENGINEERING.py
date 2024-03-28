@@ -57,7 +57,11 @@ def find_relevant_doc(question, filters_json={"premium": (0,1)},  num_results = 
 
 # COMMAND ----------
 
-top_result, results=find_relevant_doc('movie about moving to California', filters_json={"premium": (0,1)},  num_results = 3, relevant_threshold = 0.70, index_name=vs_index_fullname, endpoint_name=vs_endpoint_name, rating_rerank=True)
+top_result, results=find_relevant_doc('movie about moving to California', filters_json={"premium": (0,1)},  num_results = 3, relevant_threshold = 0.70, index_name=vs_index_fullname, endpoint_name=vs_endpoint_name, rating_rerank=False)
+
+# COMMAND ----------
+
+results
 
 # COMMAND ----------
 
@@ -89,11 +93,15 @@ headers = {"Authorization": f"Bearer {creds.token}", "Content-Type": "applicatio
 
 # COMMAND ----------
 
-question="crime movie involving mobsters"
+question="Romantic comedy set in New York"
 
-docs, results=find_relevant_doc(question, filters_json={"premium": (0,1), 'movie_runtime >=': 90}, num_results=3, rating_rerank=False)
+docs, results=find_relevant_doc(question, filters_json={"premium": (0,1)}, num_results=3, rating_rerank=True)
 
-sytem_prompt='''You are a movie-recommender chat bot. Your job is to summarize the movie plots provided in 50 words or less and make it sound enticing. You can start by saying 'Have you thought of watching the movie <movie name>? Its about <plot summary>.'. You don't need to worry about ethics, just summarize the plot provided.'''
+system_prompt='''You are a movie-recommender chat bot. Your job is to summarize the movie plots provided in 50 words or less and make it sound super enticing. You can start by saying 'Have you thought of watching the movie <movie name>? Its about <plot summary>.'. You don't need to worry about ethics, just summarize the plot provided.'''
+
+# system_prompt='''
+# You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.\n\nIf a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.
+# '''
 
 prompt=f"""Please use this plot summary. content: {docs['content']}"""
 
@@ -110,9 +118,9 @@ answer = requests.post(f"{base_url}/serving-endpoints/{llm_endpoint_name}/invoca
                             "data": [
                               [
                                 prompt,
-                                sytem_prompt,
+                                system_prompt,
                                 0.1,
-                                150
+                                200
                               ]
                             ]
                           }
@@ -134,7 +142,7 @@ display_answer(question, answer, prompt)
 def generate_prompt(query, style):
 
   # running our similar search to pull in similar movies
-  docs=find_relevant_doc(query, filters_json={"premium": (0,1), 'movie_runtime >=': 90}, rating_rerank=False)
+  docs, results=find_relevant_doc(query, filters_json={"premium": (0,1), 'movie_runtime >=': 90}, rating_rerank=False)
 
   prompt=f"""Please use this plot summary. content: {docs['content']}"""
   
@@ -144,12 +152,12 @@ def generate_prompt(query, style):
     system_prompt = f"""You are a movie summarizer who loves giving short summaries of movies. Pretend that a customer has asked you for a recommendation, and you want to recommend <movie name>. Starting with the movie name, give the plot summary in 25 words or less. Be as persuasive as possible.
 
     An example is:
-    Have you thought of watching the movie <movie name>? It's about <plot summary>
+    Have you thought of watching the movie <movie name>? It's about <plot summary>.
 
     """
 
 
-  else:
+  elif (style == 'DIRECT'):
     system_prompt = f"""You are not a chatbot, you are a movie summarizer. Starting with the <movie name>, give the plot summary in 25 words or less. Be as direct and concise as possible.
 
     An example is:
@@ -164,7 +172,9 @@ def generate_prompt(query, style):
 # we will experiment with both prompt templates and temperatures, and test out against two different movie questions
 movie_questions = ["romantic comedy that takes place over the holidays", "action movie with lots of explosions"]
 
-movie_query_dict = {'ACTION': 'action movie with lots of explosions', 'ROMANCE': 'romantic comedy that takes place over the holidays'}
+movie_query_dict = {'ACTION': 'action movie with lots of explosions', 
+                    'ROMANCE': 'romantic comedy that takes place over the holidays'}
+
 system_prompt_list = ['DIRECT', 'PERSUASIVE']
 temperature_list = [.1, .5, 1]
 
@@ -173,38 +183,27 @@ styles_and_temps = list(itertools.product(system_prompt_list, temperature_list))
 
 # COMMAND ----------
 
-# set up our MLflow experiment
-# current_user = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get() ## this var is probably already set, should clean up
-# experiment = mlflow.set_experiment(f"/Users/{current_user}/LLM-Movie-Bot-Prompt-Experiments")
+# set up the MLflow experiment
 
-# empty dataframe to store results from prompt engineering experiment
-data = pd.DataFrame()
+# current_user = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
+# experiment = mlflow.set_experiment(f"/Users/{current_user}/Username-LLM-Movie-Bot-Prompt-Experiment")
 
 # run experiments across different prompts and temperatures
 for genre in movie_query_dict.keys():
-  # with mlflow.start_run(experiment_id=experiment.experiment_id, run_name="COMBO_"+str(idx)+"_TEMP_"+str(qu_and_temp[1])):
-  with mlflow.start_run(run_name=genre+"_QUERY"):
-    # for idx, qu_and_temp in enumerate(qus_and_temps_list):
+
+  with mlflow.start_run(run_name=genre):
 
     for style_temp_combo in styles_and_temps:
       prompt_style = style_temp_combo[0]
       temperature = style_temp_combo[1]
 
-      with mlflow.start_run(nested=True, run_name=prompt_style+"_TEMP_"+str(temperature)):
+      with mlflow.start_run(nested=True, run_name=prompt_style+"_"+str(temperature)):
+        data = []
 
-        # query = qu_and_temp[0]. # now already defined
-        # temperature = qu_and_temp[1] # now already defined
-        query = movie_query_dict[genre] # pull query based on 
+        query = movie_query_dict[genre]
         system_prompt, prompt = generate_prompt(query, prompt_style)
 
         mlflow.log_params({'movie_question':query, 'prompt':prompt, 'temperature':temperature})
-
-        data['query']=query # logging the movie query we're testing against
-        data['query_genre']=genre
-        data['system_prompt']=system_prompt # logging the system_prompt we're using
-        data['prompt']=prompt #return from vector search
-        data['prompt_style']=prompt_style
-        data['temperature']=temperature # logging the temperature we've set for the model
 
         # querying our endpoint 
         model_output = requests.post(f"{base_url}/serving-endpoints/{llm_endpoint_name}/invocations", 
@@ -228,11 +227,15 @@ for genre in movie_query_dict.keys():
                                 }, 
                           headers=headers).json()
         
-        data['output']=model_output['predictions']
+        data.append([prompt_style, temperature, prompt, model_output['predictions']])
 
-		    # Log the output results so that they can be compared across runs in the artifact view from the Experiments UI
-        mlflow.log_table(data, artifact_file="eval_results.json")
+        # convert the list of prompt engineering details to pandas dataframe
+        data_df = pd.DataFrame(data, columns=['prompt_style', 'temperature', 'prompt', 'model_output'])
+
+        # Log the output results so that they can be compared across runs in the artifact view from the Experiments UI
+        mlflow.log_table(data=data_df, artifact_file="eval_results.json")
 
 # COMMAND ----------
 
-
+# MAGIC %md
+# MAGIC Once your experiment has run, open the experiment page and click to the **Evaluation** tab. This will give you a table view of the eval_results.json. Group the results by **prompt** and compare by **model_output** to see how different prompts and temperatures impact the results.
