@@ -44,6 +44,14 @@ login(token=hf_token)
 
 # COMMAND ----------
 
+
+
+# COMMAND ----------
+
+
+
+# COMMAND ----------
+
 # it is suggested to pin the revision commit hash and not change it for reproducibility because the uploader might change the model afterwards; you can find the commmit history of llamav2-7b-chat in https://huggingface.co/meta-llama/Llama-2-7b-chat-hf/commits/main
 
 model_id = "meta-llama/Llama-2-7b-chat-hf" # official version, gated (needs login to Hugging Face)
@@ -148,8 +156,8 @@ input_example=pd.DataFrame({
 
 # COMMAND ----------
 
-# Log the model with its details such as artifacts, pip requirements and input example
-# This may take a couple of minutes to complete
+# # Log the model with its details such as artifacts, pip requirements and input example
+# # This may take a couple of minutes to complete
 with mlflow.start_run() as run:  
     mlflow.pyfunc.log_model(
         registered_model_name=registered_llm_model_name,
@@ -200,6 +208,7 @@ def wait_for_endpoint(serving_endpoint_name):
 
 def create_endpoint(serving_endpoint_name, served_models):
   """Create serving endpoint and wait for it to be ready"""
+
   print(f"Creating new serving endpoint: {serving_endpoint_name}")
   endpoint_url = f'https://{serving_host}/api/2.0/serving-endpoints'
   headers = { 'Authorization': f'Bearer {creds.token}' }

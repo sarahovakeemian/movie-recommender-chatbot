@@ -93,7 +93,7 @@ headers = {"Authorization": f"Bearer {creds.token}", "Content-Type": "applicatio
 
 # COMMAND ----------
 
-question="Romantic comedy set in New York"
+question="Movie about a guy who sees patterns in everything"
 
 docs, results=find_relevant_doc(question, filters_json={"premium": (0,1)}, num_results=3, rating_rerank=True)
 
@@ -225,9 +225,9 @@ for genre in movie_query_dict.keys():
                                     ]
                                   }
                                 }, 
-                          headers=headers).json()
+                          headers=headers).json()['predictions'][0]
         
-        data.append([prompt_style, temperature, prompt, model_output['predictions']])
+        data.append([prompt_style, temperature, prompt, model_output])
 
         # convert the list of prompt engineering details to pandas dataframe
         data_df = pd.DataFrame(data, columns=['prompt_style', 'temperature', 'prompt', 'model_output'])

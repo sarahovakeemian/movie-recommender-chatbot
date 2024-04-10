@@ -15,12 +15,12 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install --upgrade --force-reinstall databricks-vectorsearch
+# MAGIC %pip install databricks-vectorsearch
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
-#import Vector Search and initiate the class
+# import Vector Search and initiate the class
 from databricks.vector_search.client import VectorSearchClient
 vsc = VectorSearchClient()
 
@@ -37,25 +37,32 @@ spark.sql(f'''
 
 # COMMAND ----------
 
-#create a Vector Search Index
-vsc.create_endpoint(
-    name=vs_endpoint_name,
-    endpoint_type="STANDARD" #PERFORMANCE_OPTIMIZED, STORAGE_OPTIMIZED
-)
+# create a Vector Search Index (although in this case we're going to reuse the demo endpoint)
+# vsc.create_endpoint(
+#     name=vs_endpoint_name,
+#     endpoint_type="STANDARD" #PERFORMANCE_OPTIMIZED, STORAGE_OPTIMIZED
+# )
 
 # COMMAND ----------
 
-# Use the following code if you need to delete the vs endpoint created.
+# Use the following code if you need to delete the vs endpoint created (but don't delete the demo endpoint!)
 # vsc.delete_endpoint(f'{vs_endpoint_name}')
 
 # COMMAND ----------
 
-#List Vector Search Endpoints in workspace ( you shoudl see the one you created in previous cell)
+#List Vector Search Endpoints in workspace (you should see the one you created in previous cell)
 vsc.list_endpoints()
 
 # COMMAND ----------
 
-#create a vector search sync with a delta table. This will create a serverless DLT job that will manage creating the embeddings of any new documents that are added to the delta table.
+print(sync_table_fullname)
+print(vs_endpoint_name)
+print(vs_index_fullname)
+print(embedding_endpoint_name)
+
+# COMMAND ----------
+
+# create a vector search sync with a delta table. This will create a serverless DLT job that will manage creating the embeddings of any new documents that are added to the delta table.
 vsc.create_delta_sync_index(
   endpoint_name=vs_endpoint_name,
   source_table_name=sync_table_fullname,
@@ -88,17 +95,20 @@ vsc.create_delta_sync_index(
 
 # COMMAND ----------
 
-#Once our Vector Search Index is created (may take some time depending on how many documents are synced), lets do a similarity search
+# Once our Vector Search Index is created (may take some time depending on how many documents are synced), lets do a similarity search
 results = vsc.get_index(index_name=vs_index_fullname, endpoint_name=vs_endpoint_name).similarity_search(
-  query_text="romantic comedy set in new york",
+  query_text="romantic comedy set in New York",
   columns=["wikipedia_movie_id", "document", "premium", 'movie_runtime', 'childproof', 'rating'],
-  filters= {"premium": 1,
-            'movie_runtime >=': 90},
-  num_results=10)
+  filters= {"premium": (1)},
+  num_results=3)
 
 # COMMAND ----------
 
-results_columns=["wikipedia_movie_id", "document", "premium", 'movie_runtime', 'childproof', 'rating', 'score']
+results
+
+# COMMAND ----------
+
+results_columns=['wikipedia_movie_id', 'document', 'premium', 'movie_runtime', 'childproof', 'rating', 'score']
 results_df=spark.createDataFrame(results['result']['data_array'], schema=results_columns)
 
 # COMMAND ----------
@@ -115,7 +125,7 @@ display(results_df)
 
 # COMMAND ----------
 
-# let's take 1000 documents that don't exist in our Vector Search Index and add them to our delta table that is synced with the Vector Search Index
+# Let's take 1000 documents that don't exist in our Vector Search Index and add them to our delta table that is synced with the Vector Search Index
 df=spark.sql(f'''
              select 
                 wikipedia_movie_id,
@@ -152,11 +162,19 @@ display(df)
 
 # COMMAND ----------
 
+df.count()
+
+# COMMAND ----------
+
 df.write.mode("append").saveAsTable(f"{sync_table_fullname}")
 
 # COMMAND ----------
 
-#let's sync our Vector Search Index. We can do this programatically through the python SDk or through the UI
+# Let's sync our Vector Search Index. We can do this programatically through the python SDk or through the UI
 vsc.get_index(
     index_name=vs_index_fullname,
     endpoint_name=vs_endpoint_name).sync()
+
+# COMMAND ----------
+
+
