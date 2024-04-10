@@ -4,7 +4,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install --upgrade --force-reinstall databricks-vectorsearch
+# MAGIC %pip install databricks-vectorsearch
 # MAGIC
 # MAGIC %pip install mlflow==2.9.0 lxml==4.9.3 langchain==0.0.344 databricks-vectorsearch==0.22 cloudpickle==2.2.1 databricks-sdk==0.12.0 cloudpickle==2.2.1 pydantic==2.5.2
 # MAGIC
@@ -101,19 +101,25 @@ chain2.invoke({"person": "obama", "language": "spanish"})
 
 os.environ["SERPAPI_API_KEY"] ='4cbdc6699f3110c59a0e1189869009cbd2b2846758ce00a591cb24135df724e5'
 
-llm = ChatDatabricks(endpoint="databricks-llama-2-70b-chat", max_tokens = 200, temperature=1)
+llm = ChatDatabricks(endpoint="databricks-llama-2-70b-chat", max_tokens = 200)
 tools = load_tools(["serpapi", "llm-math"], llm=llm)
 agent = initialize_agent(tools, 
                          llm, 
                          agent="zero-shot-react-description", 
-                         verbose=True)
+                         verbose=True,
+                         handle_parsing_errors=True)
 
-agent.run("Who is the United States President? How old will the president be in 5 years?")
-# agent.run("Who is the current leader of Japan? What is their age divided by 2")
+# agent.run("Who is the United States President? What will be their age in 5 years?")
+# agent.run("What 350 raised to the power of 2?")
+agent.run("Who is the current leader of Japan? What is their age multiplied by 2? Answer both questions")
 
 # COMMAND ----------
 
-tools
+tools[0]
+
+# COMMAND ----------
+
+tools[1]
 
 # COMMAND ----------
 
@@ -352,7 +358,6 @@ def _find_relevant_doc(_dict):
 
 # COMMAND ----------
 
-#### THIS WORKS!!!
 llm = ChatDatabricks(endpoint="databricks-llama-2-70b-chat", max_tokens = 200)
 
 template='''
@@ -379,11 +384,8 @@ retrieval_chain = (
     StrOutputParser()
 )
 
-
-
 # COMMAND ----------
 
-#### THIS WORKS!!!
 retrieval_chain.invoke({"question": 'romantic comedy set in new york city',
                         "filters_json": {"premium": (0,1)},
                         "num_results": 3,
@@ -495,4 +497,5 @@ memory.save_context({"input": user_input},
                     {"output": chatbot_response})
 
 print(chatbot_response)
+print('################################')
 print("Memory Summarizer:", memory.buffer.split("New summary:")[-1])

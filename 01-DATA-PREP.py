@@ -24,7 +24,6 @@ from pyspark.sql import functions as F
 from pyspark.sql import types as T
 from databricks.sdk.runtime import *
 
-
 from langchain.text_splitter import TokenTextSplitter
 from typing import Iterator
 import pandas as pd
@@ -47,7 +46,7 @@ from random import randint
 
 # COMMAND ----------
 
-#function to read movie.metadata.tsv
+# function to read movie.metadata.tsv
 def ms_movie_metadata_bronze(volume_path):
     return (
         spark.read.format("csv")
@@ -68,7 +67,7 @@ def ms_movie_metadata_bronze(volume_path):
 
 # COMMAND ----------
 
-#function to read plot_summaries.txt
+# function to read plot_summaries.txt
 def ms_plot_summaries_bronze(volume_path):
     return (
         spark.read.format("csv")
@@ -82,14 +81,18 @@ def ms_plot_summaries_bronze(volume_path):
 
 # COMMAND ----------
 
-#write movie metadata to delta table
+print(f"Catalog: {catalog},\nSchema: {schema}\nTable: ms_movie_metadata_bronze")
+
+# COMMAND ----------
+
+# write movie metadata to delta table
 df = ms_movie_metadata_bronze(volume_path)
 df.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.ms_movie_metadata_bronze")
 display(spark.table(f"{catalog}.{schema}.ms_movie_metadata_bronze"))
 
 # COMMAND ----------
 
-#write plot summaries to delta table
+# write plot summaries to delta table
 df = ms_plot_summaries_bronze(volume_path)
 df.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.ms_plot_summaries_bronze")
 display(spark.table(f"{catalog}.{schema}.ms_plot_summaries_bronze"))
@@ -104,7 +107,7 @@ display(spark.table(f"{catalog}.{schema}.ms_plot_summaries_bronze"))
 
 # COMMAND ----------
 
-#reading metadata table and some data cleanup
+# reading metadata table and some data cleanup
 def read_movie_metadata(catalog, schema):
     return (
         spark.table(f"{catalog}.{schema}.ms_movie_metadata_bronze")
@@ -115,11 +118,11 @@ def read_movie_metadata(catalog, schema):
         .withColumn("movie_genres", F.from_json("movie_genres", "map<string,string>"))
         .withColumn("movie_genres", F.map_values("movie_genres")))
 
-#reading plot summaries table
+# reading plot summaries table
 def read_plot_summaries(catalog, schema):
     return spark.table(f"{catalog}.{schema}.ms_plot_summaries_bronze")
 
-#joining plot summaries with metadata tables
+# joining plot summaries with metadata tables
 def read_movie_documents(catalog, schema):
     return (
         read_movie_metadata(catalog, schema)
@@ -148,7 +151,7 @@ def rating_generator():
 
 rating_generator_udf = F.udf(lambda: rating_generator(), T.IntegerType())
 
-documents=documents.withColumn('rating', rating_generator_udf())
+documents = documents.withColumn('rating', rating_generator_udf())
 
 # COMMAND ----------
 
@@ -226,35 +229,52 @@ documents.createOrReplaceTempView("documents")
 # MAGIC   avg(document_num_tokens_llama) as mean_tokens,
 # MAGIC   max(document_num_tokens_llama) as max_tokens,
 # MAGIC   min(document_num_tokens_llama) as min_tokens,
-# MAGIC   sum(case when document_num_tokens_llama>3500 then 1 else 0 end) as documents_3500
+# MAGIC   sum(case when document_num_tokens_llama>2000 then 1 else 0 end) as documents_2000
 # MAGIC from documents
 
 # COMMAND ----------
 
-#to keep things simple for this workshop we are going to remove all documents with a token limit about 3500. This is because Llama-2 has a token input limit of 4096 tokens. 
+# to keep things simple for this workshop we are going to remove all documents with a token limit of about 2000. This is because Llama-2 has a token input limit of 4096 tokens. 
 
-documents=documents.filter(documents.document_num_tokens_llama <=3500)
+documents = documents.filter(documents.document_num_tokens_llama <= 2000)
+print((documents.count(), len(documents.columns)))
 
 # COMMAND ----------
 
-#write to delta table
+# write to delta table
 documents.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.movie_documents_silver")
 
 # COMMAND ----------
 
-# delta table to use
-df=spark.sql(f'''select wikipedia_movie_id, document, movie_name, movie_release_date, movie_runtime, childproof, premium, rating, document_num_tokens_llama, document_num_chars, 
-document_num_words from {catalog}.{schema}.movie_documents_silver limit 10000;''')
+# delta table to use with a subset of movie documents
+df = spark.sql(f'''select wikipedia_movie_id, 
+                          document, 
+                          movie_name, 
+                          movie_release_date, 
+                          movie_runtime, 
+                          childproof, 
+                          premium, 
+                          rating,       
+                          document_num_tokens_llama, 
+                          document_num_chars, 
+                          document_num_words 
+                      from {catalog}.{schema}.movie_documents_silver
+                      limit 10000;''')
 
 # COMMAND ----------
 
-#creating a subset of data for vector search delta sync
+# MAGIC %sql
+# MAGIC select count(*) from ml_shovakeemian.llm_workshop.movie_documents_silver;
+
+# COMMAND ----------
+
+# creating data for vector search delta sync
 df.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.{sync_table_name}")
 
 # COMMAND ----------
 
 spark.sql(f'''
-          ALTER TABLE {catalog}.{schema}.movie_documents_for_sync SET TBLPROPERTIES (delta.enableChangeDataFeed = true)
+          ALTER TABLE {catalog}.{schema}.{sync_table_name} SET TBLPROPERTIES (delta.enableChangeDataFeed = true)
           ''')
 
 # COMMAND ----------
@@ -263,7 +283,7 @@ spark.sql(f'''
 # MAGIC
 # MAGIC ## 3. DATA CHUNKING
 # MAGIC
-# MAGIC We won't be using chunking in this rag bot, but I wanted to include how you would do this. This is a good strategy if you need extra control over token input. 
+# MAGIC We won't be using chunking in this RAG bot, but if you want to use it, this is a good strategy if you need extra control over token input. 
 
 # COMMAND ----------
 
@@ -325,7 +345,3 @@ display(results)
 # COMMAND ----------
 
 results.write.mode("overwrite").saveAsTable(f"{catalog}.{schema}.movie_documents_silver_chunked")
-
-# COMMAND ----------
-
-
